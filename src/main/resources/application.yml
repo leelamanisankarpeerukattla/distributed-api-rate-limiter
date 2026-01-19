@@ -1,0 +1,45 @@
+server:
+  port: 8085
+
+spring:
+  application:
+    name: distributed-api-rate-limiter
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+ratelimiter:
+  # FAIL_CLOSED: deny if Redis is unavailable (safer)
+  # FAIL_OPEN: allow if Redis is unavailable (more available)
+  defaultMode: FAIL_CLOSED
+  keyPrefix: rl
+  policies:
+    - id: perUserOrders
+      enabled: true
+      match:
+        endpoint: "POST:/orders"
+      keyType: USER
+      algorithm: TOKEN_BUCKET
+      capacity: 20
+      refillTokens: 20
+      refillPeriodMs: 60000
+
+    - id: perIpGlobal
+      enabled: true
+      match:
+        endpoint: "*"
+      keyType: IP
+      algorithm: SLIDING_WINDOW
+      limit: 300
+      windowMs: 60000
