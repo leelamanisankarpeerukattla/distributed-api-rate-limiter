@@ -1,7 +1,6 @@
 # Distributed API Rate Limiter & Protection Service
+[![CI](https://github.com/leelamanisankarpeerukattla/distributed-api-rate-limiter/actions/workflows/ci.yml/badge.svg)]
 
-![CI](https://github.com/<YOUR_GITHUB_USERNAME>/distributed-api-rate-limiter/actions/workflows/ci.yml/badge.svg)
-![License](https://img.shields.io/badge/license-MIT-blue.svg)
 
 **Java • Spring Boot • Redis (Lua) • Docker • GitHub Actions • Actuator/Prometheus**
 
@@ -178,5 +177,4 @@ mvn test
 
 ---
 
-## License
-MIT
+
