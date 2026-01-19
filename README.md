@@ -1,5 +1,6 @@
 # Distributed API Rate Limiter & Protection Service
-[![CI](https://github.com/leelamanisankarpeerukattla/distributed-api-rate-limiter/actions/workflows/ci.yml/badge.svg)]
+![CI](https://github.com/leelamanisankarpeerukattla/distributed-api-rate-limiter/actions/workflows/ci.yml/badge.svg)
+![License](https://img.shields.io/badge/license-MIT-blue.svg)
 
 
 **Java • Spring Boot • Redis (Lua) • Docker • GitHub Actions • Actuator/Prometheus**
@@ -10,11 +11,11 @@ A production-style, distributed rate limiting service that enforces per-user, pe
 
 ## At-a-glance
 
-- ✅ **Token Bucket** (burst-friendly)
-- ✅ **Sliding Window Log** (precise window enforcement)
-- ✅ **Per-user / per-IP / per-endpoint** policies
-- ✅ **Fail-open / Fail-closed** behavior on Redis outages
-- ✅ **Metrics** + Prometheus endpoint via Actuator
+- **Token Bucket** (burst-friendly)
+- **Sliding Window Log** (precise window enforcement)
+- **Per-user / per-IP / per-endpoint** policies
+- **Fail-open / Fail-closed** behavior on Redis outages
+- **Metrics** + Prometheus endpoint via Actuator
 
 ---
 
@@ -33,14 +34,49 @@ Redis (hash/zset)
 ```
 
 ### Request flow
-- The service matches a policy for `endpoint` (e.g. `POST:/orders`).
-- It resolves a key (user, IP, or API key) and builds a deterministic Redis key.
-- It executes a Lua script atomically in Redis.
-- It returns an allow/deny decision with headers:
-  - `X-RateLimit-Limit`
-  - `X-RateLimit-Remaining`
-  - `X-RateLimit-Reset`
-  - `Retry-After`
+### Sequence Diagram
+```mermaid
+sequenceDiagram
+  autonumber
+  participant C as Client
+  participant API as RateLimiter API (Spring Boot)
+  participant PM as Policy Matcher
+  participant KR as Key Resolver
+  participant R as Redis (Lua)
+
+  C->>API: POST /v1/ratelimit/check { endpoint, tokens, key? }
+  API->>PM: Match policy for endpoint
+  PM-->>API: policy (id, algorithm, limits, keyType, mode)
+  API->>KR: Resolve identifier (USER / API / IP)
+  KR-->>API: resolvedKey + redisKey
+  API->>R: EVAL Lua script (Token Bucket / Sliding Window)
+  R-->>API: decision (allowed, remaining, resetEpochMs, retryAfterMs)
+  API-->>C: JSON response + headers
+```
+
+### Decision Flow
+```mermaid
+flowchart TD
+  A[Incoming request] --> B[POST /v1/ratelimit/check]
+  B --> C[Match policy by endpoint]
+  C --> D[Resolve key: USER / API / IP]
+  D --> E[Build Redis key]
+  E --> F{Algorithm?}
+
+  F -->|Token Bucket| G[Lua: refill + consume tokens]
+  F -->|Sliding Window| H[Lua: prune window + count requests]
+
+  G --> I{Allowed?}
+  H --> I{Allowed?}
+
+  I -->|Yes| J[allowed=true, Retry-After=0]
+  I -->|No| K[allowed=false, retryAfterMs > 0]
+
+  J --> L[Set rate-limit headers]
+  K --> L
+  L --> M[Return response]
+```
+
 
 ---
 
@@ -149,12 +185,10 @@ Key resolution:
 - Health: `GET /actuator/health`
 - Prometheus: `GET /actuator/prometheus`
 
-Emits:
-- `ratelimiter_decisions_total{policy,algorithm,outcome}`
 
 ---
 
-## Quick start (local)
+## Quick start 
 
 ### Prerequisites
 - Docker Desktop
